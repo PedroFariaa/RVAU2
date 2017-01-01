@@ -2,6 +2,7 @@
 #include <sstream>
 #include <time.h>
 #include <stdio.h>
+#include <fstream>
 
 #include <opencv2/core/core.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
@@ -15,13 +16,6 @@
 using namespace cv;
 using namespace std;
 
-static void help()
-{
-	cout << "This is a camera calibration sample." << endl
-		<< "Usage: calibration configurationFile" << endl
-		<< "Near the sample file you'll find the configuration file, which has detailed help of "
-		"how to edit it.  It may be any OpenCV supported file format XML/YAML." << endl;
-}
 class Settings
 {
 public:
@@ -216,13 +210,13 @@ bool runCalibrationAndSave(Settings& s, Size imageSize, Mat&  cameraMatrix, Mat&
 
 int main(int argc, char* argv[])
 {
-	help();
 	Settings s;
 	const string inputSettingsFile = argc > 1 ? argv[1] : "default.xml";
 	FileStorage fs(inputSettingsFile, FileStorage::READ); // Read the settings
 	if (!fs.isOpened())
 	{
 		cout << "Could not open the configuration file: \"" << inputSettingsFile << "\"" << endl;
+		system("PAUSE");
 		return -1;
 	}
 	fs["Settings"] >> s;
@@ -231,6 +225,7 @@ int main(int argc, char* argv[])
 	if (!s.goodInput)
 	{
 		cout << "Invalid input detected. Application stopping. " << endl;
+		system("PAUSE");
 		return -1;
 	}
 
@@ -450,7 +445,7 @@ static bool runCalibration(Settings& s, Size& imageSize, Mat& cameraMatrix, Mat&
 	double rms = calibrateCamera(objectPoints, imagePoints, imageSize, cameraMatrix,
 		distCoeffs, rvecs, tvecs, s.flag | CV_CALIB_FIX_K4 | CV_CALIB_FIX_K5);
 
-	cout << "Re-projection error reported by calibrateCamera: " << rms << endl;
+	//cout << "Re-projection error reported by calibrateCamera: "<< rms << endl;
 
 	bool ok = checkRange(cameraMatrix) && checkRange(distCoeffs);
 
@@ -470,6 +465,7 @@ static void saveCameraParams(Settings& s, Size& imageSize, Mat& cameraMatrix, Ma
 
 	time_t tm;
 	time(&tm);
+//	struct tm *t2 = localtime(&tm);
 	struct tm t2;
 	localtime_s(&t2, &tm);
 	char buf[1024];
@@ -538,6 +534,15 @@ static void saveCameraParams(Settings& s, Size& imageSize, Mat& cameraMatrix, Ma
 		}
 		fs << "Image_points" << imagePtMat;
 	}
+
+	ofstream intrinsic_parameters("intrinsic_parameters.txt", ofstream::trunc);
+
+	if (intrinsic_parameters.is_open())
+	{
+		intrinsic_parameters << cameraMatrix;
+		intrinsic_parameters.close();
+		cout << "Intrinsic parameters saved in file: intrinsic_parameters.txt" << endl;
+	}
 }
 
 bool runCalibrationAndSave(Settings& s, Size imageSize, Mat&  cameraMatrix, Mat& distCoeffs, vector<vector<Point2f> > imagePoints)
@@ -548,8 +553,8 @@ bool runCalibrationAndSave(Settings& s, Size imageSize, Mat&  cameraMatrix, Mat&
 
 	bool ok = runCalibration(s, imageSize, cameraMatrix, distCoeffs, imagePoints, rvecs, tvecs,
 		reprojErrs, totalAvgErr);
-	cout << (ok ? "Calibration succeeded" : "Calibration failed")
-		<< ". avg re projection error = " << totalAvgErr;
+	cout << (ok ? "Calibration succeeded." : "Calibration failed.")
+		/* << ". avg re projection error = "  << totalAvgErr */ << endl;
 
 	if (ok)
 		saveCameraParams(s, imageSize, cameraMatrix, distCoeffs, rvecs, tvecs, reprojErrs,
