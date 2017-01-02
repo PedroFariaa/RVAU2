@@ -208,7 +208,7 @@ enum { DETECTION = 0, CAPTURING = 1, CALIBRATED = 2 };
 bool runCalibrationAndSave(Settings& s, Size imageSize, Mat&  cameraMatrix, Mat& distCoeffs,
 	vector<vector<Point2f> > imagePoints);
 
-int main(int argc, char* argv[])
+int Calibration_main(int argc, char* argv[])
 {
 	Settings s;
 	const string inputSettingsFile = argc > 1 ? argv[1] : "default.xml";
