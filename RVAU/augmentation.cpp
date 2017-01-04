@@ -78,10 +78,14 @@ int tutorial_mode(){
 		cvtColor(img2, img3, CV_BGR2GRAY);
 		threshold(tHold, tHold, 50, 255, CV_THRESH_OTSU);
 
+		cout << "Image binarization" << endl;
+
+		cout << "Image Thresholding using OTSU to separate black and white bits" << endl;
+
 		imshow("Thresholded Image", tHold);
 		waitKey();
 		destroyWindow("Thresholded Image");
-		
+
 		Mat canny_output;
 		vector<vector<Point> > contours;
 		vector<Vec4i> hierarchy;
@@ -93,6 +97,9 @@ int tutorial_mode(){
 		waitKey();
 		destroyWindow("canny");
 
+		cout << "Contours: contours extrated from the thresholded image using canny edge detector" << endl;
+		cout << "Contours: use morphological operation on image to improve the contour detection (Opening)" << endl;
+
 		// you could also reuse img1 here
 		Mat mask = Mat::zeros(canny_output.rows, canny_output.cols, CV_8UC1);	
 		// CV_FILLED fills the connected components found
@@ -103,16 +110,19 @@ int tutorial_mode(){
 			cv::Size(2 * erosion_size + 1, 2 * erosion_size + 1),
 			cv::Point(erosion_size, erosion_size));
 
-		// Apply erosion or dilation on the image - closing
+		// Apply erosion or dilation on the image - opening
 		erode(mask, mask, element);
 		dilate(mask, mask, element);
 
 		Mat crop(img2.rows, img2.cols, CV_8UC3);
 		// set background to green
 		crop.setTo(Scalar(0, 255, 0));
-		// and copy the magic apple
+
 		img2.copyTo(crop, mask);
 		normalize(mask.clone(), mask, 0.0, 255.0, CV_MINMAX, CV_8UC1);
+
+		cout << "Candidates analysis: Polygon approximation (the marker has to be convex and have at least 4 points) " << endl;
+		cout << "Candidates analysis: apply mask, cropping image to recalculate contours " << endl;
 
 		imshow("detect marker using mask", mask);
 		waitKey();
@@ -153,6 +163,10 @@ int tutorial_mode(){
 				line(img2, rect_points[j], rect_points[(j + 1) % 4], color, 1, 8);
 		}
 
+
+		cout << "Corners: corners detection based on the mask image" << endl;
+
+
 		imshow("display marker contours", img2);
 		waitKey();
 		destroyWindow("display marker contours");
@@ -171,7 +185,7 @@ int tutorial_mode(){
 
 
 		/*
-		// MARIA
+		//using harris corner detection
 		vector< Point2f > corners;
 		Mat mask;
 		double qualityLevel = 0.01;
@@ -248,7 +262,7 @@ void drawPyramid(InputOutputArray _image, InputArray _cameraMatrix, InputArray _
 	pyrPoints.push_back(Point3f(length, -length, 0));
 	pyrPoints.push_back(Point3f(0, 0, x2));
 
-	pyrPoints.push_back(Point3f(0, 1, 0));
+	pyrPoints.push_back(Point3f(1, 0, 0));
 	pyrPoints.push_back(Point3f(0, 0, 1));
 	vector< Point2f > imagePoints;
 	projectPoints(pyrPoints, _rvec, _tvec, _cameraMatrix, _distCoeffs, imagePoints);
