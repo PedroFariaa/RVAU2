@@ -217,7 +217,7 @@ enum { DETECTION = 0, CAPTURING = 1, CALIBRATED = 2 };
 bool runCalibrationAndSave(Settings& s, Size imageSize, Mat&  cameraMatrix, Mat& distCoeffs,
 	vector<vector<Point2f> > imagePoints);
 
-int calibration(int argc, char* argv[])
+int calibration_mode(int argc, char* argv[])
 {
 	help();
 	Settings s;

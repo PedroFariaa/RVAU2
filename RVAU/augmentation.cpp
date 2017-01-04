@@ -14,6 +14,7 @@ using namespace cv;
 
 vector<Mat> markers;
 vector<string> obj;
+string object;
 
 
 // helper function :
@@ -64,8 +65,6 @@ void showMarkers(){
 }
 
 int tutorial_mode(){
-	//augmentation();
-	
 	
 	Mat img2;
 	VideoCapture cap(0);
@@ -80,7 +79,8 @@ int tutorial_mode(){
 		threshold(tHold, tHold, 50, 255, CV_THRESH_OTSU);
 
 		imshow("Thresholded Image", tHold);
-		waitKey(1);
+		waitKey();
+		destroyWindow("Thresholded Image");
 		
 		Mat canny_output;
 		vector<vector<Point> > contours;
@@ -90,7 +90,8 @@ int tutorial_mode(){
 		/// Find contours
 		findContours(canny_output, contours, hierarchy, CV_RETR_EXTERNAL, CV_CHAIN_APPROX_NONE, Point(0, 0));
 		imshow("canny", canny_output);
-
+		waitKey();
+		destroyWindow("canny");
 
 		// you could also reuse img1 here
 		Mat mask = Mat::zeros(canny_output.rows, canny_output.cols, CV_8UC1);	
@@ -113,8 +114,13 @@ int tutorial_mode(){
 		img2.copyTo(crop, mask);
 		normalize(mask.clone(), mask, 0.0, 255.0, CV_MINMAX, CV_8UC1);
 
-		imshow("mask", mask);
-		imshow("cropped", crop);
+		imshow("detect marker using mask", mask);
+		waitKey();
+		destroyWindow("detect marker using mask");
+
+		imshow("crop marker", crop);
+		waitKey();
+		destroyWindow("crop marker");
 
 
 		// anotehr canny
@@ -124,7 +130,9 @@ int tutorial_mode(){
 		Canny(crop, canny_output2, 100, 200);
 		/// Find contours
 		findContours(canny_output2, contours2, hierarchy2, CV_RETR_EXTERNAL, CV_CHAIN_APPROX_NONE, Point(0, 0));
-		imshow("canny2", canny_output2);
+		imshow("find marker contours", canny_output2);
+		waitKey();
+		destroyWindow("find marker contours");
 
 		vector<RotatedRect> minRect(contours2.size());
 		for (int i = 0; i < contours2.size(); i++)
@@ -145,7 +153,9 @@ int tutorial_mode(){
 				line(img2, rect_points[j], rect_points[(j + 1) % 4], color, 1, 8);
 		}
 
-		imshow("Contours", img2);
+		imshow("display marker contours", img2);
+		waitKey();
+		destroyWindow("display marker contours");
 
 		/*
 		//hough
@@ -212,15 +222,48 @@ int tutorial_mode(){
 	
 }
 
-void drawQuad(Mat image, Mat points, Scalar color) {
-	//cout << points.at<Point2f>(0, 0) << " " << points.at<Point2f>(0, 1) << " " << points.at<Point2f>(0, 2) << " " << points.at<Point2f>(0, 3) << endl;
-	line(image, points.at<Point2f>(0, 0), points.at<Point2f>(0, 1), color);
-	line(image, points.at<Point2f>(0, 1), points.at<Point2f>(0, 2), color);
-	line(image, points.at<Point2f>(0, 2), points.at<Point2f>(0, 3), color);
-	line(image, points.at<Point2f>(0, 3), points.at<Point2f>(0, 0), color);
+//draw pyramid function
+void drawPyramid(InputOutputArray _image, InputArray _cameraMatrix, InputArray _distCoeffs,
+	InputArray _rvec, InputArray _tvec, float length, Scalar color) {
+
+	float x2 = length * 2;
+
+	// project axis points
+	vector< Point3f > pyrPoints;
+	pyrPoints.push_back(Point3f(-length, -length, 0));
+	pyrPoints.push_back(Point3f(-length, length, 0));
+	pyrPoints.push_back(Point3f(length, length, 0));
+	pyrPoints.push_back(Point3f(length, -length, 0));
+	pyrPoints.push_back(Point3f(-length, length, 0));
+	pyrPoints.push_back(Point3f(length, length, 0));
+	pyrPoints.push_back(Point3f(length, -length, 0));
+	pyrPoints.push_back(Point3f(-length, -length, 0));
+
+	pyrPoints.push_back(Point3f(-length, -length, 0));
+	pyrPoints.push_back(Point3f(0, 0, x2));
+	pyrPoints.push_back(Point3f(-length, length, 0));
+	pyrPoints.push_back(Point3f(0, 0, x2));
+	pyrPoints.push_back(Point3f(length, length, 0));
+	pyrPoints.push_back(Point3f(0, 0, x2));
+	pyrPoints.push_back(Point3f(length, -length, 0));
+	pyrPoints.push_back(Point3f(0, 0, x2));
+
+	pyrPoints.push_back(Point3f(0, 1, 0));
+	pyrPoints.push_back(Point3f(0, 0, 1));
+	vector< Point2f > imagePoints;
+	projectPoints(pyrPoints, _rvec, _tvec, _cameraMatrix, _distCoeffs, imagePoints);
+
+	// draw axis lines
+
+	for (int i = 0; i < imagePoints.size() - 2; i += 2)
+		line(_image, imagePoints[i], imagePoints[i + 1], color, 3);
+
 }
 
 
+
+
+// draw cube function
 void drawCube(InputOutputArray _image, InputArray _cameraMatrix, InputArray _distCoeffs,
 	InputArray _rvec, InputArray _tvec, float length, Scalar color) {
 
@@ -328,7 +371,7 @@ int compareMarkers(Mat found) {
 }
 
 
-int main(int argc, char** argv) {
+int augmentation_mode() {
 	Scalar red(255, 0, 0);
 	Scalar green(0, 255, 0);
 	Scalar blue(0, 0, 255);
@@ -383,12 +426,14 @@ int main(int argc, char** argv) {
 			Mat rvec;
 			Mat tvec;
 			solvePnP(objectPointsMat, squares[0], intrinsics, distortion, rvec, tvec);
-
+			
 			cout << "rvec = " << rvec << endl;
 			cout << "tvec = " << tvec << endl;
 
-			//drawQuad(image, squares[0], green);
-			//drawCube(image, intrinsics, distortion, rvec, tvec, 1, Scalar(0, 0, 255));
+			if(object == "cube")
+				drawCube(image, intrinsics, distortion, rvec, tvec, 1, Scalar(0, 0, 255));
+			if (object == "pyramid")
+				drawPyramid(image, intrinsics, distortion, rvec, tvec, 1, Scalar(0, 0, 255));
 
 			vector<Point3f> line3d = { { 0, 0, 0 },{ 0, 0, 1 } };
 			vector<Point2f> line2d;
@@ -404,9 +449,54 @@ int main(int argc, char** argv) {
 	return 0;
 }
 
+void choseObj() {
+	char ans;
+	cout << "[C]ube" << endl;
+	cout << "[P]yramid" << endl;
+	cin >> ans;
 
-int mainB(int argc, char** argv) {
-	//augmentation();
+	if (ans == 'c' || ans == 'C')
+		object = "cube";
+	else if (ans == 'p' || ans == 'P')
+		object = "pyramid";
+	else {
+		cout << "Invalid input !" << endl << endl;
+		choseObj();
+	}
+}
+
+void menu() {
+	// menu
+	int ans;
+	cout << "[1] Display markers" << endl;
+	cout << "[2] Augmentation mode" << endl;
+	cout << "[3] Tutorial mode" << endl;
+	cin >> ans;
+
+	if (ans == 1) {
+		loadMarkers();
+		showMarkers();
+		menu();
+	}
+	else if (ans == 2) {
+		choseObj();
+		augmentation_mode();
+		menu();
+	}
+	else if (ans == 3) {
+		tutorial_mode();
+		menu();
+	}
+	else {
+		cout << "Invalid input !" << endl;
+		menu();
+	}
+}
+
+int main(int argc, char** argv) {
+
+	menu();
 	return 0;
 
 }
+
