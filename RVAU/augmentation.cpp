@@ -328,7 +328,7 @@ int compareMarkers(Mat found) {
 }
 
 
-int augmentation() {
+int main(int argc, char** argv) {
 	Scalar red(255, 0, 0);
 	Scalar green(0, 255, 0);
 	Scalar blue(0, 0, 255);
@@ -342,7 +342,7 @@ int augmentation() {
 		cout << "Run calibration (in ../RVAU/) first!" << endl;
 		return 1;
 	}
-	
+
 	VideoCapture cap(0);
 	if (!cap.isOpened())  // check if we succeeded
 		return -1;
@@ -359,7 +359,7 @@ int augmentation() {
 		threshold(blurredImage, threshImage, 128.0, 255.0, THRESH_OTSU);
 		vector<vector<Point> > contours;
 		findContours(threshImage, contours, CV_RETR_LIST, CV_CHAIN_APPROX_NONE);
-		// drawContours(image, contours, -1, color);
+		//drawContours(image, contours, -1, red);
 
 		vector<Mat> squares;
 		for (auto contour : contours) {
@@ -375,7 +375,6 @@ int augmentation() {
 			}
 		}
 
-		
 		if (squares.size() > 0) {
 			vector<Point3f> objectPoints = { Point3f(-1, -1, 0), Point3f(-1, 1, 0), Point3f(1, 1, 0), Point3f(1, -1, 0) };
 			Mat objectPointsMat(objectPoints);
@@ -388,14 +387,8 @@ int augmentation() {
 			cout << "rvec = " << rvec << endl;
 			cout << "tvec = " << tvec << endl;
 
-			int ind = compareMarkers(squares[0]);
-			if (obj[ind] == "cube") {
-				drawCube(image, intrinsics, distortion, rvec, tvec, 1, Scalar(0, 0, 255));
-			}
-			else {
-				drawCube(image, intrinsics, distortion, rvec, tvec, 1, Scalar(0, 0, 255));
-			}
-			
+			//drawQuad(image, squares[0], green);
+			//drawCube(image, intrinsics, distortion, rvec, tvec, 1, Scalar(0, 0, 255));
 
 			vector<Point3f> line3d = { { 0, 0, 0 },{ 0, 0, 1 } };
 			vector<Point2f> line2d;
@@ -412,7 +405,8 @@ int augmentation() {
 }
 
 
-int main(int argc, char** argv) {
-	augmentation();
+int mainB(int argc, char** argv) {
+	//augmentation();
+	return 0;
 
 }
