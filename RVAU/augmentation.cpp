@@ -2,6 +2,8 @@
 #include <opencv2/imgproc/imgproc.hpp>
 #include <opencv2/calib3d/calib3d.hpp>
 #include <opencv2/highgui/highgui.hpp>
+#include "opencv2/features2d/features2d.hpp"
+#include "opencv2/features2d.hpp"
 
 #include <iostream>
 #include <windows.h>
@@ -11,6 +13,7 @@ using namespace cv;
 
 
 vector<Mat> markers;
+vector<string> obj;
 
 
 // helper function :
@@ -60,13 +63,7 @@ void showMarkers(){
 	waitKey();
 }
 
-void augmentation() {
-
-	loadMarkers();
-	showMarkers();
-}
-
-int main(int argc, char* argv[]) {
+int tutorial_mode(){
 	//augmentation();
 	
 	
@@ -213,4 +210,209 @@ int main(int argc, char* argv[]) {
 
 	return 0;
 	
+}
+
+void drawQuad(Mat image, Mat points, Scalar color) {
+	//cout << points.at<Point2f>(0, 0) << " " << points.at<Point2f>(0, 1) << " " << points.at<Point2f>(0, 2) << " " << points.at<Point2f>(0, 3) << endl;
+	line(image, points.at<Point2f>(0, 0), points.at<Point2f>(0, 1), color);
+	line(image, points.at<Point2f>(0, 1), points.at<Point2f>(0, 2), color);
+	line(image, points.at<Point2f>(0, 2), points.at<Point2f>(0, 3), color);
+	line(image, points.at<Point2f>(0, 3), points.at<Point2f>(0, 0), color);
+}
+
+
+void drawCube(InputOutputArray _image, InputArray _cameraMatrix, InputArray _distCoeffs,
+	InputArray _rvec, InputArray _tvec, float length, Scalar color) {
+
+	float x2 = length * 2;
+
+	// project axis points
+	vector< Point3f > cubePoints;
+	cubePoints.push_back(Point3f(-length, -length, 0));
+	cubePoints.push_back(Point3f(-length, length, 0));
+	cubePoints.push_back(Point3f(length, length, 0));
+	cubePoints.push_back(Point3f(length, -length, 0));
+	cubePoints.push_back(Point3f(-length, length, 0));
+	cubePoints.push_back(Point3f(length, length, 0));
+	cubePoints.push_back(Point3f(length, -length, 0));
+	cubePoints.push_back(Point3f(-length, -length, 0));
+
+	cubePoints.push_back(Point3f(-length, -length, x2));
+	cubePoints.push_back(Point3f(-length, length, x2));
+	cubePoints.push_back(Point3f(length, length, x2));
+	cubePoints.push_back(Point3f(length, -length, x2));
+	cubePoints.push_back(Point3f(-length, length, x2));
+	cubePoints.push_back(Point3f(length, length, x2));
+	cubePoints.push_back(Point3f(length, -length, x2));
+	cubePoints.push_back(Point3f(-length, -length, x2));
+
+	cubePoints.push_back(Point3f(-length, -length, 0));
+	cubePoints.push_back(Point3f(-length, -length, x2));
+	cubePoints.push_back(Point3f(-length, length, 0));
+	cubePoints.push_back(Point3f(-length, length, x2));
+	cubePoints.push_back(Point3f(length, length, 0));
+	cubePoints.push_back(Point3f(length, length, x2));
+	cubePoints.push_back(Point3f(length, -length, 0));
+	cubePoints.push_back(Point3f(length, -length, x2));
+
+	cubePoints.push_back(Point3f(0, 1, 0));
+	cubePoints.push_back(Point3f(0, 0, 1));
+	vector< Point2f > imagePoints;
+	projectPoints(cubePoints, _rvec, _tvec, _cameraMatrix, _distCoeffs, imagePoints);
+
+	// draw axis lines
+
+	for (int i = 0; i < imagePoints.size() - 2; i += 2)
+		line(_image, imagePoints[i], imagePoints[i + 1], color, 3);
+
+}
+
+int compareMarkers(Mat found) {
+	if (markers.size() == 0)
+		loadMarkers();
+	
+	Ptr<FeatureDetector> detector = FastFeatureDetector::create();
+	vector<KeyPoint> keypoints1, keypoints2;
+	vector< vector<KeyPoint>> markers_kp;
+	Mat descriptors1, descriptors2;
+	vector<Mat> markers_desc;
+	FlannBasedMatcher matcher;
+	vector< DMatch > matches;
+	vector<int> good_matches;
+	int gdm ;
+	double max_dist = 0; double min_dist = 100;
+
+	detector->detect(found, keypoints1);
+	detector->compute(found, keypoints1, descriptors1);
+
+	for (int i = 0; i < markers.size(); i++) {
+		int gdm = 0;
+		//detect keypoints
+		detector->detect(markers[i], keypoints2);
+		markers_kp.push_back(keypoints2);
+		keypoints2.clear();
+		//compute descriptors
+		detector->compute(markers[i], keypoints2, descriptors2);
+		markers_desc.push_back(descriptors2);
+		//matcher
+		matcher.match(descriptors1, markers_desc[i], matches);
+		max_dist = 0;
+		min_dist = 100;
+		//-- Quick calculation of max and min distances between keypoints
+		for (int i = 0; i < descriptors1.rows; i++) {
+			double dist = matches[i].distance;
+			if (dist < min_dist)
+				min_dist = dist;
+			if (dist > max_dist)
+				max_dist = dist;
+		}
+
+		for (int i = 0; i < descriptors1.rows; i++)
+			if (matches[i].distance < 3 * min_dist)
+				gdm++;
+
+		good_matches.push_back(gdm);
+
+	}
+
+	int ind;
+	int ind_m = 0;
+
+	for(int m = 0; m < good_matches.size(); m++)
+		if (good_matches[m] > ind_m) {
+			ind = m;
+			ind_m = good_matches[m];
+		}
+
+	return ind;
+}
+
+
+int augmentation() {
+	Scalar red(255, 0, 0);
+	Scalar green(0, 255, 0);
+	Scalar blue(0, 0, 255);
+
+	FileStorage fs("../RVAU/out_camera_data.xml", FileStorage::READ);
+	Mat intrinsics, distortion;
+	fs["Camera_Matrix"] >> intrinsics;
+	fs["Distortion_Coefficients"] >> distortion;
+
+	if (intrinsics.rows != 3 || intrinsics.cols != 3 || distortion.rows != 5 || distortion.cols != 1) {
+		cout << "Run calibration (in ../RVAU/) first!" << endl;
+		return 1;
+	}
+	
+	VideoCapture cap(0);
+	if (!cap.isOpened())  // check if we succeeded
+		return -1;
+
+	Mat image;
+
+	for (;;) {
+		cap >> image;
+		Mat grayImage;
+		cvtColor(image, grayImage, CV_RGB2GRAY);
+		Mat blurredImage;
+		blur(grayImage, blurredImage, Size(5, 5));
+		Mat threshImage;
+		threshold(blurredImage, threshImage, 128.0, 255.0, THRESH_OTSU);
+		vector<vector<Point> > contours;
+		findContours(threshImage, contours, CV_RETR_LIST, CV_CHAIN_APPROX_NONE);
+		// drawContours(image, contours, -1, color);
+
+		vector<Mat> squares;
+		for (auto contour : contours) {
+			vector<Point> approx;
+			approxPolyDP(contour, approx, arcLength(Mat(contour), true)*0.02, true);
+			if (approx.size() == 4 &&
+				fabs(contourArea(Mat(approx))) > 1000 &&
+				isContourConvex(Mat(approx)))
+			{
+				Mat squareMat;
+				Mat(approx).convertTo(squareMat, CV_32FC3);
+				squares.push_back(squareMat);
+			}
+		}
+
+		
+		if (squares.size() > 0) {
+			vector<Point3f> objectPoints = { Point3f(-1, -1, 0), Point3f(-1, 1, 0), Point3f(1, 1, 0), Point3f(1, -1, 0) };
+			Mat objectPointsMat(objectPoints);
+			cout << "objectPointsMat: " << objectPointsMat.rows << ", " << objectPointsMat.cols << endl;
+			cout << "squares[0]: " << squares[0] << endl;
+			Mat rvec;
+			Mat tvec;
+			solvePnP(objectPointsMat, squares[0], intrinsics, distortion, rvec, tvec);
+
+			cout << "rvec = " << rvec << endl;
+			cout << "tvec = " << tvec << endl;
+
+			int ind = compareMarkers(squares[0]);
+			if (obj[ind] == "cube") {
+				drawCube(image, intrinsics, distortion, rvec, tvec, 1, Scalar(0, 0, 255));
+			}
+			else {
+				drawCube(image, intrinsics, distortion, rvec, tvec, 1, Scalar(0, 0, 255));
+			}
+			
+
+			vector<Point3f> line3d = { { 0, 0, 0 },{ 0, 0, 1 } };
+			vector<Point2f> line2d;
+			projectPoints(line3d, rvec, tvec, intrinsics, distortion, line2d);
+			cout << "line2d = " << line2d << endl;
+			line(image, line2d[0], line2d[1], red);
+		}
+
+		cv::imshow("image", image);
+		cv::waitKey(1);
+	}
+
+	return 0;
+}
+
+
+int main(int argc, char** argv) {
+	augmentation();
+
 }
